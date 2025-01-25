@@ -1,4 +1,4 @@
-pip install sqlalchemy
+!pip install sqlalchemy
 
 import streamlit as st
 import pandas as pd
