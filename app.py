@@ -59,13 +59,13 @@ if "menu" not in st.session_state:
 
 # Botões para cada funcionalidade
 st.sidebar.header("Escolha uma opção:")
-if st.sidebar.button("Visualizar Dados"):
+if st.sidebar.button("Visualizar Dados", key="visualizar_dados_btn"):
     st.session_state["menu"] = "Visualizar Dados"
-if st.sidebar.button("Inserir Registro"):
+if st.sidebar.button("Inserir Registro", key="inserir_registro_btn"):
     st.session_state["menu"] = "Inserir Registro"
-if st.sidebar.button("Alterar Registro"):
+if st.sidebar.button("Alterar Registro", key="alterar_registro_btn"):
     st.session_state["menu"] = "Alterar Registro"
-if st.sidebar.button("Excluir Registro"):
+if st.sidebar.button("Excluir Registro", key="excluir_registro_btn"):
     st.session_state["menu"] = "Excluir Registro"
 
 # Funções para cada seção
@@ -156,7 +156,7 @@ def excluir_registro():
             st.error("Não há registros para excluir.")
             return
         registro_id = st.selectbox("Selecione o ID do registro para excluir:", df["id"])
-        if st.button("Excluir Registro"):
+        if st.button("Excluir Registro", key="excluir_registro_confirm_btn"):
             query = text("DELETE FROM pessoas WHERE id = :id")
             with engine.begin() as conn:
                 conn.execute(query, {"id": registro_id})
