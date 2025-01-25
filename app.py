@@ -6,11 +6,26 @@ from sqlalchemy import create_engine, text
 # Conexão com o banco de dados
 engine = create_engine("sqlite:///banco_de_dados.db")
 
-# Função para criar o banco de dados e tabela, caso não existam
+# Função para criar ou atualizar a estrutura da tabela
 def inicializar_banco():
     with engine.begin() as conn:
-        # Criação da tabela, se não existir
-        conn.execute(text("""
+        # Verificar se a tabela já existe
+        result = conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='pessoas'"
+        )).fetchone()
+
+        # Recriar a tabela se a estrutura for incompatível
+        if result:
+            colunas = conn.execute(text("PRAGMA table_info(pessoas)")).fetchall()
+            colunas_existentes = {col[1] for col in colunas}
+
+            # Se a coluna 'profissao' não existir, recriar a tabela
+            if "profissao" not in colunas_existentes:
+                conn.execute(text("DROP TABLE pessoas"))
+
+        # Criar tabela, se necessário
+        conn.execute(text(
+            """
             CREATE TABLE IF NOT EXISTS pessoas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nome TEXT NOT NULL,
@@ -18,10 +33,11 @@ def inicializar_banco():
                 cidade TEXT NOT NULL,
                 profissao TEXT NOT NULL
             )
-        """))
+            """
+        ))
+
         # Inserir dados iniciais, se a tabela estiver vazia
-        result = conn.execute(text("SELECT COUNT(*) AS count FROM pessoas"))
-        count = result.scalar()
+        count = conn.execute(text("SELECT COUNT(*) FROM pessoas")).scalar()
         if count == 0:
             dados_iniciais = pd.DataFrame({
                 "nome": [f"Pessoa {i}" for i in range(1, 11)],
@@ -69,10 +85,12 @@ def inserir_registro():
             if novo_nome.strip() == "":
                 st.error("O campo 'Nome' não pode estar vazio!")
             else:
-                query = text("""
+                query = text(
+                    """
                     INSERT INTO pessoas (nome, idade, cidade, profissao)
                     VALUES (:nome, :idade, :cidade, :profissao)
-                """)
+                    """
+                )
                 try:
                     with engine.begin() as conn:
                         conn.execute(query, {
@@ -97,21 +115,21 @@ def alterar_registro():
         with st.form("alterar_form"):
             novo_nome = st.text_input("Nome:", value=registro_atual["nome"].values[0])
             nova_idade = st.number_input("Idade:", min_value=0, max_value=120, value=int(registro_atual["idade"].values[0]))
-            nova_cidade = st.selectbox("Cidade:", ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"],
-                                       index=["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"].index(registro_atual["cidade"].values[0]))
-            nova_profissao = st.selectbox("Profissão:", ["Engenheiro", "Professor", "Médico", "Advogado"],
-                                          index=["Engenheiro", "Professor", "Médico", "Advogado"].index(registro_atual["profissao"].values[0]))
+            nova_cidade = st.selectbox("Cidade:", ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"], index=["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"].index(registro_atual["cidade"].values[0]))
+            nova_profissao = st.selectbox("Profissão:", ["Engenheiro", "Professor", "Médico", "Advogado"], index=["Engenheiro", "Professor", "Médico", "Advogado"].index(registro_atual["profissao"].values[0]))
             submit = st.form_submit_button("Alterar Registro")
 
             if submit:
                 if novo_nome.strip() == "":
                     st.error("O campo 'Nome' não pode estar vazio!")
                 else:
-                    query = text("""
+                    query = text(
+                        """
                         UPDATE pessoas
                         SET nome = :nome, idade = :idade, cidade = :cidade, profissao = :profissao
                         WHERE id = :id
-                    """)
+                        """
+                    )
                     with engine.begin() as conn:
                         conn.execute(query, {
                             "nome": novo_nome,
@@ -149,4 +167,3 @@ elif st.session_state["menu"] == "Alterar Registro":
     alterar_registro()
 elif st.session_state["menu"] == "Excluir Registro":
     excluir_registro()
-
