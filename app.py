@@ -4,11 +4,11 @@ import numpy as np
 from sqlalchemy import create_engine, text
 
 # Conexão com o banco de dados
-engine = create_engine('sqlite:///banco_de_dados.db')
+engine = create_engine("sqlite:///banco_de_dados.db")
 
 # Função para criar o banco de dados e tabela, caso não existam
 def inicializar_banco():
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         # Criação da tabela, se não existir
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS pessoas (
@@ -20,7 +20,7 @@ def inicializar_banco():
             )
         """))
         # Inserir dados iniciais, se a tabela estiver vazia
-        result = conn.execute(text("SELECT COUNT(*) FROM pessoas"))
+        result = conn.execute(text("SELECT COUNT(*) AS count FROM pessoas"))
         count = result.scalar()
         if count == 0:
             dados_iniciais = pd.DataFrame({
@@ -43,27 +43,20 @@ if "menu" not in st.session_state:
 
 # Botões para cada funcionalidade
 st.sidebar.header("Escolha uma opção:")
-if st.sidebar.button("Visualizar Dados"):
-    st.session_state["menu"] = "Visualizar Dados"
-if st.sidebar.button("Inserir Registro"):
-    st.session_state["menu"] = "Inserir Registro"
-if st.sidebar.button("Alterar Registro"):
-    st.session_state["menu"] = "Alterar Registro"
-if st.sidebar.button("Excluir Registro"):
-    st.session_state["menu"] = "Excluir Registro"
+menus = ["Visualizar Dados", "Inserir Registro", "Alterar Registro", "Excluir Registro"]
+st.session_state["menu"] = st.sidebar.radio("Selecione:", menus)
 
-# Verifica qual opção está ativa e exibe a seção correspondente
-menu = st.session_state["menu"]
-
-# 1. Visualizar Dados
-if menu == "Visualizar Dados":
+# Funções para cada seção
+def visualizar_dados():
     st.header("Visualizar Dados")
-    query = "SELECT * FROM pessoas"
-    df = pd.read_sql(query, con=engine)
-    st.dataframe(df)
+    try:
+        query = "SELECT * FROM pessoas"
+        df = pd.read_sql(query, con=engine)
+        st.dataframe(df)
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
 
-# 2. Inserir Registro
-elif menu == "Inserir Registro":
+def inserir_registro():
     st.header("Inserir Novo Registro")
     with st.form("inserir_form"):
         novo_nome = st.text_input("Nome:")
@@ -92,31 +85,22 @@ elif menu == "Inserir Registro":
                 except Exception as e:
                     st.error(f"Erro ao inserir registro: {e}")
 
-# 3. Alterar Registro
-elif menu == "Alterar Registro":
+def alterar_registro():
     st.header("Alterar Registro")
-    df = pd.read_sql("SELECT * FROM pessoas", con=engine)
-    if df.empty:
-        st.error("Não há registros para alterar.")
-    else:
+    try:
+        df = pd.read_sql("SELECT * FROM pessoas", con=engine)
+        if df.empty:
+            st.error("Não há registros para alterar.")
+            return
         registro_id = st.selectbox("Selecione o ID do registro para alterar:", df["id"])
         registro_atual = df[df["id"] == registro_id]
-        st.write("Dados atuais:")
-        st.write(registro_atual)
-
         with st.form("alterar_form"):
             novo_nome = st.text_input("Nome:", value=registro_atual["nome"].values[0])
             nova_idade = st.number_input("Idade:", min_value=0, max_value=120, value=int(registro_atual["idade"].values[0]))
-            nova_cidade = st.selectbox(
-                "Cidade:",
-                ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"],
-                index=["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"].index(registro_atual["cidade"].values[0])
-            )
-            nova_profissao = st.selectbox(
-                "Profissão:",
-                ["Engenheiro", "Professor", "Médico", "Advogado"],
-                index=["Engenheiro", "Professor", "Médico", "Advogado"].index(registro_atual["profissao"].values[0])
-            )
+            nova_cidade = st.selectbox("Cidade:", ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"],
+                                       index=["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre"].index(registro_atual["cidade"].values[0]))
+            nova_profissao = st.selectbox("Profissão:", ["Engenheiro", "Professor", "Médico", "Advogado"],
+                                          index=["Engenheiro", "Professor", "Médico", "Advogado"].index(registro_atual["profissao"].values[0]))
             submit = st.form_submit_button("Alterar Registro")
 
             if submit:
@@ -128,32 +112,41 @@ elif menu == "Alterar Registro":
                         SET nome = :nome, idade = :idade, cidade = :cidade, profissao = :profissao
                         WHERE id = :id
                     """)
-                    try:
-                        with engine.begin() as conn:
-                            conn.execute(query, {
-                                "nome": novo_nome,
-                                "idade": nova_idade,
-                                "cidade": nova_cidade,
-                                "profissao": nova_profissao,
-                                "id": registro_id
-                            })
-                        st.success("Registro atualizado com sucesso!")
-                    except Exception as e:
-                        st.error(f"Erro ao atualizar registro: {e}")
+                    with engine.begin() as conn:
+                        conn.execute(query, {
+                            "nome": novo_nome,
+                            "idade": nova_idade,
+                            "cidade": nova_cidade,
+                            "profissao": nova_profissao,
+                            "id": registro_id
+                        })
+                    st.success("Registro atualizado com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao alterar registro: {e}")
 
-# 4. Excluir Registro
-elif menu == "Excluir Registro":
+def excluir_registro():
     st.header("Excluir Registro")
-    df = pd.read_sql("SELECT * FROM pessoas", con=engine)
-    if df.empty:
-        st.error("Não há registros para excluir.")
-    else:
+    try:
+        df = pd.read_sql("SELECT * FROM pessoas", con=engine)
+        if df.empty:
+            st.error("Não há registros para excluir.")
+            return
         registro_id = st.selectbox("Selecione o ID do registro para excluir:", df["id"])
         if st.button("Excluir Registro"):
             query = text("DELETE FROM pessoas WHERE id = :id")
-            try:
-                with engine.begin() as conn:
-                    conn.execute(query, {"id": registro_id})
-                st.success("Registro excluído com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao excluir registro: {e}")
+            with engine.begin() as conn:
+                conn.execute(query, {"id": registro_id})
+            st.success("Registro excluído com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao excluir registro: {e}")
+
+# Navegação com base na opção escolhida
+if st.session_state["menu"] == "Visualizar Dados":
+    visualizar_dados()
+elif st.session_state["menu"] == "Inserir Registro":
+    inserir_registro()
+elif st.session_state["menu"] == "Alterar Registro":
+    alterar_registro()
+elif st.session_state["menu"] == "Excluir Registro":
+    excluir_registro()
+
