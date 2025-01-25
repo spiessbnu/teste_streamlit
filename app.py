@@ -59,8 +59,14 @@ if "menu" not in st.session_state:
 
 # Botões para cada funcionalidade
 st.sidebar.header("Escolha uma opção:")
-menus = ["Visualizar Dados", "Inserir Registro", "Alterar Registro", "Excluir Registro"]
-st.session_state["menu"] = st.sidebar.radio("Selecione:", menus)
+if st.sidebar.button("Visualizar Dados"):
+    st.session_state["menu"] = "Visualizar Dados"
+if st.sidebar.button("Inserir Registro"):
+    st.session_state["menu"] = "Inserir Registro"
+if st.sidebar.button("Alterar Registro"):
+    st.session_state["menu"] = "Alterar Registro"
+if st.sidebar.button("Excluir Registro"):
+    st.session_state["menu"] = "Excluir Registro"
 
 # Funções para cada seção
 def visualizar_dados():
